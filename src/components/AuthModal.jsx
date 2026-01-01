@@ -4,26 +4,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sparkles, Check, X, ShieldCheck, Eye, EyeOff, ArrowLeft, Mail } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Sparkles, Check, X, ShieldCheck, Eye, EyeOff, ArrowLeft, Mail, Loader2 } from "lucide-react";import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { base44 } from "@/api/base44Client"; // IMPORTADO
-import { sendPasswordRecoveryEmail } from "@/api/emailService"; // IMPORTADO
+import { base44 } from "@/api/base44Client"; 
+import { sendPasswordRecoveryEmail } from "@/api/emailService"; 
 
 export default function AuthModal() {
   const { isAuthModalOpen, setIsAuthModalOpen, login, register, authView, setAuthView } = useAuth();
   
-  // Estados do Formulário
   const [formData, setFormData] = useState({ name: "", email: "", password: "", confirmPassword: "" });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   
-  // Estados de Interface
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Estados para validação de senha
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [passwordCriteria, setPasswordCriteria] = useState({
     length: false,
@@ -71,10 +67,9 @@ export default function AuthModal() {
       );
   };
 
-  // --- NOVA FUNÇÃO: Gerar senha temporária forte ---
   const generateTempPassword = () => {
-    const randomNum = Math.floor(1000 + Math.random() * 9000); // 4 números
-    return `Lusa@${randomNum}`; // Ex: Lusa@9281 (Cumpre os requisitos de segurança)
+    const randomNum = Math.floor(1000 + Math.random() * 9000); 
+    return `Lusa@${randomNum}`; 
   };
 
   const handleSubmit = async (e) => {
@@ -83,7 +78,7 @@ export default function AuthModal() {
     setSuccessMsg("");
 
     if (!validateEmail(formData.email)) {
-      setError("Por favor, insira um email válido.");
+      setError("Por favor, introduza um e-mail válido.");
       return;
     }
 
@@ -94,47 +89,38 @@ export default function AuthModal() {
         await login(formData.email, formData.password);
       
       } else if (authView === 'register') {
-        // Validações de Registro
         if (formData.name.trim().length < 3) throw new Error("O nome deve ter pelo menos 3 letras.");
-        if (passwordStrength < 3) throw new Error("A senha precisa ser mais forte.");
-        if (formData.password !== formData.confirmPassword) throw new Error("As passwords não coincidem.");
-        if (!acceptedTerms) throw new Error("Precisa aceitar a Política de Privacidade e Termos de Uso.");
+        if (passwordStrength < 3) throw new Error("A palavra-passe precisa de ser mais forte.");
+        if (formData.password !== formData.confirmPassword) throw new Error("As palavras-passe não coincidem.");
+        if (!acceptedTerms) throw new Error("É necessário aceitar a Política de Privacidade e os Termos de Utilização.");
         
         await register({ full_name: formData.name, email: formData.email, password: formData.password });
       
       } else if (authView === 'forgot') {
-        // --- LÓGICA REAL DE RECUPERAÇÃO ---
-        
-        // 1. Procurar o usuário no banco
         const users = await base44.entities.User.filter({ email: formData.email });
         
         if (!users || users.length === 0) {
-          throw new Error("Não encontramos nenhuma conta com este email.");
+          throw new Error("Não encontrámos nenhuma conta com este e-mail.");
         }
         
         const targetUser = users[0];
         const tempPassword = generateTempPassword();
 
-        // 2. Atualizar a senha no banco de dados
         await base44.entities.User.update(targetUser.id, { password: tempPassword });
-
-        // 3. Enviar o email com a senha temporária
         await sendPasswordRecoveryEmail(formData.email, tempPassword, targetUser.full_name);
 
-        setSuccessMsg(`Email enviado! Verifique a sua caixa de entrada (e spam). Enviámos uma senha temporária.`);
+        setSuccessMsg(`Sucesso! Enviámos uma palavra-passe temporária para o seu e-mail.`);
         setFormData({ ...formData, email: "" });
-        return; // Retorna para não fechar o modal
       }
 
     } catch (err) {
       console.error(err);
-      setError(err.message || "Ocorreu um erro ao processar.");
+      setError(err.message || "Ocorreu um erro ao processar o seu pedido.");
     } finally {
       setLoading(false);
     }
   };
 
-  // --- VIEW TEASER ---
   if (authView === 'teaser') {
     return (
       <Dialog open={isAuthModalOpen} onOpenChange={setIsAuthModalOpen}>
@@ -144,17 +130,17 @@ export default function AuthModal() {
               <Sparkles className="w-8 h-8 text-white" />
             </div>
             <DialogTitle className="text-2xl font-serif mb-2 text-white">
-              Ei, psiu!
+              Olá!
             </DialogTitle>
             <p className="text-gray-300 mb-6 px-4">
-              Faça login para ter acesso a promoções exclusivas, gerir os seus agendamentos e ficar por dentro das novidades da Lusa Brasileira.
+              Inicie sessão para ter acesso a promoções exclusivas e gerir os seus agendamentos na Lusa Brasileira.
             </p>
             <div className="flex flex-col gap-3">
               <Button 
                 onClick={() => setAuthView('login')} 
                 className="w-full bg-[var(--primary)] hover:opacity-90 text-white font-semibold py-6"
               >
-                Fazer Login / Cadastrar
+                Iniciar Sessão / Registar
               </Button>
               <Button 
                 variant="ghost" 
@@ -170,20 +156,19 @@ export default function AuthModal() {
     );
   }
 
-  // --- MAIN AUTH MODAL ---
   return (
     <Dialog open={isAuthModalOpen} onOpenChange={setIsAuthModalOpen}>
-      <DialogContent className="sm:max-w-md bg-white/95 backdrop-blur-xl border-white/20 shadow-2xl">
+      <DialogContent className="sm:max-w-md bg-white backdrop-blur-xl border-white/20 shadow-2xl overflow-y-auto max-h-[95vh]">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl font-serif text-gray-900">
             {authView === 'login' && 'Bem-vinda de Volta'}
             {authView === 'register' && 'Criar Conta'}
-            {authView === 'forgot' && 'Recuperar Senha'}
+            {authView === 'forgot' && 'Recuperar Palavra-passe'}
           </DialogTitle>
           <p className="text-center text-gray-500 text-sm">
             {authView === 'login' && 'Aceda à sua conta para gerir agendamentos'}
             {authView === 'register' && 'Preencha os dados abaixo'}
-            {authView === 'forgot' && 'Insira o seu email para receber uma senha temporária'}
+            {authView === 'forgot' && 'Introduza o seu e-mail para receber uma palavra-passe temporária'}
           </p>
         </DialogHeader>
 
@@ -195,40 +180,37 @@ export default function AuthModal() {
             </div>
           )}
 
-          {/* Nome (Register) */}
           {authView === 'register' && (
             <div>
-              <Label>Nome Completo</Label>
+              <Label className="text-gray-700">Nome Completo</Label>
               <Input 
                 value={formData.name}
                 onChange={e => setFormData({...formData, name: e.target.value})}
                 required 
-                className="bg-white"
+                className="bg-gray-50 border-gray-200 focus:border-[var(--primary)]"
                 placeholder="Ex: Maria Silva"
               />
             </div>
           )}
           
-          {/* Email (Todos) */}
           <div>
-            <Label>Email</Label>
+            <Label className="text-gray-700">E-mail</Label>
             <div className="relative">
               <Input 
                 type="email" 
                 value={formData.email}
                 onChange={e => setFormData({...formData, email: e.target.value})}
                 required 
-                className="bg-white pl-9" 
+                className="bg-gray-50 border-gray-200 pl-9 focus:border-[var(--primary)]" 
                 placeholder="exemplo@email.com"
               />
                <Mail className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
             </div>
           </div>
 
-          {/* Senha (Login e Register) */}
           {(authView === 'login' || authView === 'register') && (
             <div>
-              <Label className="mb-1 block">Password</Label>
+              <Label className="mb-1 block text-gray-700">Palavra-passe</Label>
               
               <div className="relative">
                 <Input 
@@ -236,31 +218,29 @@ export default function AuthModal() {
                   value={formData.password}
                   onChange={handlePasswordChange}
                   required 
-                  className="bg-white pr-10" 
+                  className="bg-gray-50 border-gray-200 pr-10 focus:border-[var(--primary)]" 
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 focus:outline-none"
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
 
-              {/* Link "Esqueci a senha" abaixo do input e à direita */}
               {authView === 'login' && (
                 <div className="flex justify-end mt-1">
                   <button 
                     type="button"
                     onClick={() => { setAuthView('forgot'); setError(""); setSuccessMsg(""); }}
-                    className="text-xs text-gray-500 hover:text-[var(--primary)] hover:underline transition-colors"
+                    className="text-xs text-gray-500 hover:text-[var(--primary)] hover:underline"
                   >
-                    Esqueceu a senha?
+                    Esqueceu-se da palavra-passe?
                   </button>
                 </div>
               )}
               
-              {/* Medidor de Força (Register) */}
               {authView === 'register' && formData.password.length > 0 && (
                 <div className="mt-3 space-y-2 p-3 bg-gray-50 rounded-md border border-gray-100">
                   <div className="flex gap-1 h-1.5 mb-2">
@@ -275,12 +255,9 @@ export default function AuthModal() {
                       />
                     ))}
                   </div>
-                  <p className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3" /> Requisitos da senha:
-                  </p>
                   <div className="grid grid-cols-2 gap-1">
                     <p className={`text-[10px] flex items-center gap-1 ${passwordCriteria.length ? 'text-green-600' : 'text-gray-400'}`}>
-                      {passwordCriteria.length ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />} Mínimo 8 caracteres
+                      {passwordCriteria.length ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />} 8+ Caracteres
                     </p>
                     <p className={`text-[10px] flex items-center gap-1 ${passwordCriteria.uppercase ? 'text-green-600' : 'text-gray-400'}`}>
                       {passwordCriteria.uppercase ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />} Maiúscula
@@ -297,26 +274,18 @@ export default function AuthModal() {
             </div>
           )}
 
-          {/* Confirmar Senha (Register) */}
           {authView === 'register' && (
             <>
               <div>
-                <Label>Confirmar Password</Label>
+                <Label className="text-gray-700">Confirmar Palavra-passe</Label>
                 <div className="relative">
                   <Input 
                     type={showPassword ? "text" : "password"} 
                     value={formData.confirmPassword}
                     onChange={e => setFormData({...formData, confirmPassword: e.target.value})}
                     required 
-                    className="bg-white pr-10"
+                    className="bg-gray-50 border-gray-200 pr-10 focus:border-[var(--primary)]"
                   />
-                   <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 focus:outline-none"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
                 </div>
               </div>
 
@@ -328,53 +297,50 @@ export default function AuthModal() {
                   onChange={(e) => setAcceptedTerms(e.target.checked)}
                   className="mt-1 h-4 w-4 rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]"
                 />
-                <label
-                  htmlFor="terms"
-                  className="text-xs text-gray-600 leading-tight select-none cursor-pointer"
-                >
+                <label htmlFor="terms" className="text-xs text-gray-600 leading-tight cursor-pointer">
                   Li e aceito a{" "}
-                  <Link to={createPageUrl("PrivacyPolicy")} target="_blank" className="text-[var(--primary)] hover:underline">
-                    Política de Privacidade
-                  </Link>{" "}
-                  e os{" "}
-                  <Link to={createPageUrl("TermsOfUse")} target="_blank" className="text-[var(--primary)] hover:underline">
-                    Termos de Uso
-                  </Link>.
+                  <Link to={createPageUrl("PrivacyPolicy")} target="_blank" className="text-[var(--primary)] hover:underline">Política de Privacidade</Link>
+                  {" "}e os{" "}
+                  <Link to={createPageUrl("TermsOfUse")} target="_blank" className="text-[var(--primary)] hover:underline">Termos de Utilização</Link>.
                 </label>
               </div>
             </>
           )}
 
-          {error && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded">{error}</p>}
+          {error && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded border border-red-100">{error}</p>}
 
-          <Button type="submit" className="w-full bg-[var(--primary)] hover:opacity-90 mt-2" disabled={loading}>
-            {loading ? 'A processar...' : (
-              authView === 'login' ? 'Entrar' : 
-              authView === 'register' ? 'Criar Conta' : 
-              'Enviar Senha Temporária'
+          <Button 
+            type="submit" 
+            className="w-full bg-[var(--primary)] hover:opacity-90 mt-2 h-12 text-white font-bold" 
+            disabled={loading}
+          >
+            {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (
+              authView === 'login' ? 'Entrar na Conta' : 
+              authView === 'register' ? 'Criar a minha Conta' : 
+              'Enviar Palavra-passe Temporária'
             )}
           </Button>
         </form>
 
-        <div className="mt-4 text-center text-sm">
+        <div className="mt-6 text-center text-sm border-t border-gray-100 pt-4">
           {authView === 'login' && (
-            <p>
+            <p className="text-gray-600">
               Ainda não tem conta?{" "}
-              <button onClick={() => { setAuthView('register'); setError(""); }} className="text-[var(--primary)] font-semibold hover:underline">
+              <button onClick={() => { setAuthView('register'); setError(""); }} className="text-[var(--primary)] font-bold hover:underline">
                 Registar agora
               </button>
             </p>
           )}
           {authView === 'register' && (
-            <p>
+            <p className="text-gray-600">
               Já tem conta?{" "}
-              <button onClick={() => { setAuthView('login'); setError(""); }} className="text-[var(--primary)] font-semibold hover:underline">
-                Fazer Login
+              <button onClick={() => { setAuthView('login'); setError(""); }} className="text-[var(--primary)] font-bold hover:underline">
+                Iniciar Sessão
               </button>
             </p>
           )}
           {authView === 'forgot' && (
-             <button onClick={() => { setAuthView('login'); setError(""); setSuccessMsg(""); }} className="text-gray-600 hover:text-black flex items-center justify-center gap-2 mx-auto mt-2">
+             <button onClick={() => { setAuthView('login'); setError(""); setSuccessMsg(""); }} className="text-gray-600 hover:text-black flex items-center justify-center gap-2 mx-auto">
                 <ArrowLeft className="w-3 h-3" /> Voltar ao Login
              </button>
           )}

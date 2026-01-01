@@ -1,8 +1,8 @@
-// Conector Oficial Supabase - Lusa Brasileira v1.6 (Correção Notificações)
 import { supabase } from './supabaseClient';
 
+// --- MAPEAMENTO DE TABELAS ---
 const TABLE_MAP = {
-  User: 'app_users',
+  User: 'professionals', 
   Professional: 'professionals',
   Booking: 'bookings',
   Service: 'services',
@@ -14,67 +14,58 @@ const TABLE_MAP = {
   ContactMessage: 'contact_messages'
 };
 
-// Função de Limpeza Agressiva (Whitelist)
+const preventCrash = (entityName, data) => {
+  if (!data) return [];
+  const list = Array.isArray(data) ? data : [data];
+  
+  const futureDate = "2030-01-01T12:00:00.000Z";
+  const pastDate = "2024-01-01T12:00:00.000Z";
+
+  return list.map(item => {
+    const safeItem = { ...item };
+
+    if (entityName === 'Announcement') {
+      if (!safeItem.expires_at) safeItem.expires_at = futureDate;
+      if (safeItem.content && !safeItem.message) safeItem.message = safeItem.content;
+      if (safeItem.priority && !safeItem.type) safeItem.type = safeItem.priority;
+    }
+
+    if (['Notification', 'Booking', 'ContactMessage'].includes(entityName)) {
+         if (!safeItem.created_at) safeItem.created_at = pastDate;
+         if (!safeItem.created_date) safeItem.created_date = pastDate;
+         
+         if (entityName === 'Booking') {
+            if (!safeItem.booking_date) safeItem.booking_date = pastDate.split('T')[0];
+            if (!safeItem.booking_time) safeItem.booking_time = "12:00";
+         }
+    }
+
+    return safeItem;
+  });
+};
+
 const sanitizePayload = (entityName, rawData) => {
-  // 1. Definição das colunas PERMITIDAS (A Lista VIP)
-  const WHITELISTS = {
-    Booking: [
-      'service_id', 'professional_id', 'user_id',
-      'booking_date', 'booking_time',
-      'client_name', 'client_email', 'client_phone', 'notes',
-      'service_name', 'professional_name', 'duration_minutes',
-      'status'
-    ],
-    // ADICIONEI ESTA LISTA AGORA:
-    Notification: [
-      'user_id',   // Quem recebe (ID do cliente ou prof-1)
-      'type',      // info, success, warning
-      'title',     // Título
-      'message',   // Texto
-      'read',      // Lido/Não lido
-      'link'       // Link para onde vai ao clicar
-    ],
-    Service: [
-      'name', 'description', 'category', 
-      'duration_minutes', 'price', 'price_from', 
-      'is_active', 'is_featured', 'requires_consultation'
-    ]
-  };
-
-  // Se a tabela estiver na Lista VIP, usamos a limpeza estrita
-  if (WHITELISTS[entityName]) {
-    const cleanPayload = {};
-    WHITELISTS[entityName].forEach(key => {
-      if (rawData[key] !== undefined) {
-        cleanPayload[key] = rawData[key];
-      }
-    });
-
-    // Tratamentos de tipos
-    if (entityName === 'Booking') {
-      if (cleanPayload.duration_minutes) cleanPayload.duration_minutes = parseInt(cleanPayload.duration_minutes);
-    }
-    if (entityName === 'Service') {
-       if (cleanPayload.price) cleanPayload.price = parseFloat(cleanPayload.price);
-       if (cleanPayload.duration_minutes) cleanPayload.duration_minutes = parseInt(cleanPayload.duration_minutes);
-       if (isNaN(cleanPayload.price)) delete cleanPayload.price;
-       if (isNaN(cleanPayload.duration_minutes)) delete cleanPayload.duration_minutes;
-    }
-
-    return cleanPayload;
-  }
-
-  // --- Para tabelas comuns (limpeza padrão) ---
   const payload = { ...rawData };
   delete payload.id;
-  delete payload.created_at;
-  delete payload.created_date;
-
-  if (entityName === 'GalleryImage') {
-    if (payload.display_order) payload.display_order = parseInt(payload.display_order);
+  
+  if (entityName === 'Booking') {
+      if (payload.duration_minutes) payload.duration_minutes = parseInt(payload.duration_minutes);
+      if (payload.booking_date) {
+          payload.booking_date = String(payload.booking_date).substring(0, 10);
+      }
   }
-  if (entityName === 'Review') {
-    if (payload.rating) payload.rating = parseInt(payload.rating);
+
+  if (entityName === 'Announcement') {
+      if (!payload.expires_at) {
+          const d = new Date();
+          d.setDate(d.getDate() + 7);
+          payload.expires_at = d.toISOString();
+      }
+      if (!payload.type) payload.type = 'info';
+  }
+  
+  if (entityName === 'GalleryImage' && payload.display_order) {
+      payload.display_order = parseInt(payload.display_order);
   }
 
   return payload;
@@ -82,183 +73,118 @@ const sanitizePayload = (entityName, rawData) => {
 
 export const base44 = {
   auth: {
-    me: async () => {
-      const user = localStorage.getItem('user_session');
-      return user ? JSON.parse(user) : null;
-    },
+    me: async () => JSON.parse(localStorage.getItem('user_session')),
     
     login: async (email, password) => {
       const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
       const adminPass = import.meta.env.VITE_ADMIN_PASSWORD;
 
-      const cleanEmail = email.trim().toLowerCase();
-      const cleanPass = password.trim();
-
-      if (cleanEmail === adminEmail?.toLowerCase() && cleanPass === adminPass) {
+      // Login Administrativo
+      if (email.trim().toLowerCase() === adminEmail?.toLowerCase() && password.trim() === adminPass) {
         const user = { id: 'prof-1', role: 'admin', full_name: 'Ingrid (Admin)', email: adminEmail };
         localStorage.setItem('user_session', JSON.stringify(user));
         return user;
       }
 
+      // Login de Utilizadores/Clientes
       const { data, error } = await supabase
-        .from('app_users')
+        .from('professionals')
         .select('*')
-        .eq('email', cleanEmail)
-        .eq('password', cleanPass) 
+        .eq('email', email)
+        .eq('password', password)
         .single();
 
-      if (error || !data) {
-        console.error("Erro Login:", error);
-        throw new Error("Email ou senha incorretos.");
-      }
-
-      const userSafe = { ...data };
-      delete userSafe.password;
-      localStorage.setItem('user_session', JSON.stringify(userSafe));
-      return userSafe;
+      if (error) throw new Error("Credenciais inválidas ou conta inexistente.");
+      
+      localStorage.setItem('user_session', JSON.stringify(data));
+      return data;
     },
 
-    register: async (data) => {
-      const cleanEmail = data.email.trim().toLowerCase();
-      
+    // --- AQUI ESTÁ A CORREÇÃO: ADICIONAMOS A FUNÇÃO REGISTER ---
+    register: async (userData) => {
+      // Verifica se o email já existe antes de tentar criar
       const { data: existing } = await supabase
-        .from('app_users')
+        .from('professionals')
         .select('id')
-        .eq('email', cleanEmail)
-        .single();
+        .eq('email', userData.email);
 
-      if (existing) {
-        throw new Error("Este email já está registado.");
+      if (existing && existing.length > 0) {
+        throw new Error("Este e-mail já está registado.");
       }
 
-      const { data: newUser, error } = await supabase
-        .from('app_users')
-        .insert([{
-          full_name: data.full_name,
-          email: cleanEmail,
-          password: data.password.trim(),
-          role: 'client',
-          phone: data.phone || ''
-        }])
+      // Prepara os dados do novo cliente
+      const newClient = {
+        full_name: userData.full_name,
+        email: userData.email,
+        password: userData.password,
+        role: 'client',      // Define como cliente padrão
+        phone: '',           // Campos vazios para evitar erro no CRM
+        preferences: '',
+        allergies: ''
+      };
+
+      const { data, error } = await supabase
+        .from('professionals')
+        .insert([newClient])
         .select()
         .single();
 
-      if (error) {
-        console.error("Erro Registo:", error);
-        throw new Error("Erro ao criar conta.");
-      }
-
-      const userSafe = { ...newUser };
-      delete userSafe.password;
-      localStorage.setItem('user_session', JSON.stringify(userSafe));
-      return userSafe;
+      if (error) throw new Error("Erro ao criar conta: " + error.message);
+      
+      // Salva a sessão automaticamente após registo
+      localStorage.setItem('user_session', JSON.stringify(data));
+      return data;
     },
 
-    logout: async () => {
-      localStorage.removeItem('user_session');
-      window.location.href = "/";
-    }
+    logout: async () => { localStorage.clear(); window.location.href = "/"; }
   },
 
   entities: new Proxy({}, {
     get: (_, entityName) => ({
       list: async (sortParam) => {
-        const tableName = TABLE_MAP[entityName];
-        if (!tableName) return [];
-
-        let query = supabase.from(tableName).select('*');
+        const table = TABLE_MAP[entityName];
+        if (!table) return [];
+        
+        let query = supabase.from(table).select('*');
         
         if (sortParam) {
-           const isDesc = sortParam.startsWith('-');
-           const column = isDesc ? sortParam.substring(1) : sortParam;
-           if (column === 'order') query = query.order('display_order', { ascending: true });
-           else query = query.order(column, { ascending: !isDesc });
+            let col = sortParam.replace('-', '');
+            if (col === 'order') col = 'display_order';
+            if (!col.includes('date') && !col.includes('expires')) {
+                try { query = query.order(col, { ascending: !sortParam.startsWith('-') }); } catch(e){}
+            }
         }
 
         const { data, error } = await query;
-        if (error) console.error(`Erro ao listar ${entityName}:`, error);
-        return data || [];
+        if (error) { console.error(error); return []; }
+        return preventCrash(entityName, data);
       },
-      
-      filter: async (criteria) => {
-        const tableName = TABLE_MAP[entityName];
-        if (!tableName) return [];
-
-        let query = supabase.from(tableName).select('*');
-
-        Object.keys(criteria).forEach(key => {
-          const value = criteria[key];
-          
-          if (key === 'email') {
-             query = query.eq('email', value.toLowerCase());
-          } else if (typeof value === 'object' && value?.$in) {
-             query = query.in(key, value.$in);
-          } else {
-             query = query.eq(key, value);
-          }
-        });
-
-        const { data, error } = await query;
-        return data || [];
+      create: async (item) => {
+          const table = TABLE_MAP[entityName];
+          const payload = sanitizePayload(entityName, item);
+          const { data, error } = await supabase.from(table).insert([payload]).select().single();
+          if(error) throw error;
+          return data;
       },
-
-      create: async (itemData) => {
-        const tableName = TABLE_MAP[entityName];
-        const payload = sanitizePayload(entityName, itemData);
-        
-        console.log(`Tentando criar em ${tableName}:`, payload);
-
-        const { data, error } = await supabase
-          .from(tableName)
-          .insert([payload])
-          .select()
-          .single();
-
-        if (error) {
-            console.error(`Erro fatal ao criar ${entityName}:`, error);
-            throw error;
-        }
-        return data;
+      update: async (id, item) => {
+          const table = TABLE_MAP[entityName];
+          const payload = sanitizePayload(entityName, item);
+          const { data, error } = await supabase.from(table).update(payload).eq('id', id).select().single();
+          if(error) throw error;
+          return data;
       },
-      
-      update: async (id, itemData) => {
-        const tableName = TABLE_MAP[entityName];
-        const payload = sanitizePayload(entityName, itemData);
-
-        console.log(`Tentando atualizar ${tableName} ID ${id}:`, payload);
-
-        const { data, error } = await supabase
-          .from(tableName)
-          .update(payload)
-          .eq('id', id)
-          .select()
-          .single();
-          
-        if (error) {
-            console.error(`Erro fatal ao atualizar ${entityName}:`, error);
-            throw error;
-        }
-        return data;
-      },
-      
       delete: async (id) => {
-        const tableName = TABLE_MAP[entityName];
-        const { error } = await supabase
-          .from(tableName)
-          .delete()
-          .eq('id', id);
-          
-        if (error) console.error(`Erro ao deletar ${entityName}:`, error);
-        return !error;
+          const table = TABLE_MAP[entityName];
+          await supabase.from(table).delete().eq('id', id);
+          return true;
+      },
+      filter: async (c) => {
+          let q = supabase.from(TABLE_MAP[entityName]).select('*');
+          Object.keys(c).forEach(k => q = q.eq(k, c[k]));
+          const { data } = await q;
+          return preventCrash(entityName, data);
       }
     })
   }),
-
-  integrations: {
-    Core: {
-      UploadFile: async ({ file }) => {
-        return { file_url: URL.createObjectURL(file) };
-      }
-    }
-  }
+  integrations: { Core: { UploadFile: async ({ file }) => ({ file_url: URL.createObjectURL(file) }) } }
 };

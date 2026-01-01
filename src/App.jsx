@@ -4,7 +4,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/context/AuthContext";
 
 import Layout from "./components/Layout";
-import ProtectedRoute from "./components/ProtectedRoute"; // IMPORTAR AQUI
+import ProtectedRoute from "./components/ProtectedRoute"; 
+
+// Importe o Menu Flutuante
+import FloatingMenu from "@/components/FloatingMenu";
+// --- NOVO: Importe o ScrollToTop ---
+import ScrollToTop from "@/components/ScrollToTop";
 
 // Páginas Públicas
 import Home from "./pages/Home";
@@ -38,8 +43,14 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
+          {/* --- AQUI ESTÁ A CORREÇÃO --- */}
+          {/* O ScrollToTop deve ficar aqui, dentro do Router mas antes de tudo */}
+          <ScrollToTop />
+          
+          <div className="relative min-h-screen"> 
+            
             <Routes>
-              {/* --- ROTAS PÚBLICAS (Qualquer um pode ver) --- */}
+              {/* --- ROTAS PÚBLICAS --- */}
               <Route path="/" element={<Layout currentPageName="Home"><Home /></Layout>} />
               <Route path="/servicos" element={<Layout currentPageName="Services"><Services /></Layout>} />
               <Route path="/galeria" element={<Layout currentPageName="Gallery"><Gallery /></Layout>} />
@@ -48,7 +59,7 @@ export default function App() {
               <Route path="/politica-privacidade" element={<Layout currentPageName="PrivacyPolicy"><PrivacyPolicy /></Layout>} />
               <Route path="/termos-uso" element={<Layout currentPageName="TermsOfUse"><TermsOfUse /></Layout>} />
 
-              {/* --- ROTAS PROTEGIDAS (Apenas Usuários Logados) --- */}
+              {/* --- ROTAS PROTEGIDAS (Cliente) --- */}
               <Route path="/meus-agendamentos" element={
                 <ProtectedRoute>
                   <Layout currentPageName="ClientAppointments">
@@ -56,6 +67,7 @@ export default function App() {
                   </Layout>
                 </ProtectedRoute>
               } />
+              
               <Route path="/perfil" element={
                 <ProtectedRoute>
                   <Layout currentPageName="Profile">
@@ -64,8 +76,7 @@ export default function App() {
                 </ProtectedRoute>
               } />
 
-              {/* --- ROTAS BLINDADAS (Apenas ADMIN) --- */}
-              {/* Se um usuário normal tentar entrar aqui, será expulso */}
+              {/* --- ROTAS BLINDADAS (ADMIN) --- */}
               <Route path="/admin" element={
                 <ProtectedRoute roleRequired="admin">
                   <Layout currentPageName="AdminDashboard"><AdminDashboard /></Layout>
@@ -116,6 +127,11 @@ export default function App() {
               <Route path="*" element={<NotFound />} />
 
             </Routes>
+
+            {/* Menu Flutuante Global */}
+            <FloatingMenu />
+            
+          </div>
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
-import { ZoomIn, X, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { ZoomIn, X, Loader2, ChevronLeft, ChevronRight, ImageIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const categoryNames = {
   todos: "Todos",
@@ -15,7 +15,7 @@ const categoryNames = {
   noivas: "Noivas"
 };
 
-// Variantes de animação para o deslize
+// Variantes para o Lightbox (Deslizar)
 const slideVariants = {
   enter: (direction) => ({
     x: direction > 0 ? 1000 : -1000,
@@ -41,11 +41,8 @@ const swipePower = (offset, velocity) => {
 export default function Gallery() {
   const [selectedCategory, setSelectedCategory] = useState("todos");
   
-  // Agora controlamos o ÍNDICE da imagem, não o objeto
-  // null = galeria fechada
+  // Controle do Lightbox
   const [selectedIndex, setSelectedIndex] = useState(null);
-  
-  // Direção da animação (1 = direita/próxima, -1 = esquerda/anterior)
   const [direction, setDirection] = useState(0);
 
   const { data: images = [], isLoading } = useQuery({
@@ -53,7 +50,6 @@ export default function Gallery() {
     queryFn: () => base44.entities.GalleryImage.list('order'),
   });
 
-  // Filtra as imagens baseado na aba selecionada
   const filteredImages = selectedCategory === "todos" 
     ? images 
     : images.filter(img => img.category === selectedCategory);
@@ -63,11 +59,10 @@ export default function Gallery() {
     setSelectedIndex(null);
   }, [selectedCategory]);
 
-  // --- FUNÇÕES DE NAVEGAÇÃO ---
+  // Navegação do Lightbox
   const paginate = useCallback((newDirection) => {
     setDirection(newDirection);
     setSelectedIndex((prevIndex) => {
-      // Lógica circular (se for o último, vai para o primeiro e vice-versa)
       let nextIndex = prevIndex + newDirection;
       if (nextIndex < 0) nextIndex = filteredImages.length - 1;
       if (nextIndex >= filteredImages.length) nextIndex = 0;
@@ -75,67 +70,79 @@ export default function Gallery() {
     });
   }, [filteredImages.length]);
 
-  // Atalhos de Teclado (Setas e ESC)
+  // Teclado (Setas e ESC)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (selectedIndex === null) return;
-      
       if (e.key === "ArrowRight") paginate(1);
       if (e.key === "ArrowLeft") paginate(-1);
       if (e.key === "Escape") setSelectedIndex(null);
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedIndex, paginate]);
 
-  // Imagem atual baseada no índice
   const currentImage = selectedIndex !== null ? filteredImages[selectedIndex] : null;
 
   return (
     <div className="bg-white min-h-screen">
       
-      {/* Hero Section */}
+      {/* HERO ANIMADO (Igual Home e Serviços) */}
       <section className="relative h-[40vh] flex items-center justify-center overflow-hidden">
-        <div 
+        <motion.div 
           className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage: 'url(img/fotodela1.png)', 
-            filter: 'brightness(0.6)'
           }}
+          initial={{ scale: 1.1, filter: 'brightness(0.5)' }}
+          animate={{ scale: 1, filter: 'brightness(0.6)' }}
+          transition={{ duration: 8, ease: "easeOut" }}
         />
         <div className="absolute inset-0 bg-black/30" />
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
           className="relative z-10 text-center px-4"
         >
-          <h1 className="text-5xl md:text-6xl font-bold text-white mb-4" style={{fontFamily: "'Playfair Display', serif"}}>
+          <h1 className="text-5xl md:text-6xl font-bold text-white mb-4 drop-shadow-lg" style={{fontFamily: "'Playfair Display', serif"}}>
             Galeria
           </h1>
-          <p className="text-xl text-white/90">Veja os meus trabalhos mais recentes</p>
+          <p className="text-xl text-white/90 font-light">Veja os meus trabalhos mais recentes</p>
         </motion.div>
       </section>
 
-      {/* Grid de Fotos */}
+      {/* SEÇÃO PRINCIPAL */}
       <section className="py-16 px-4">
         <div className="max-w-7xl mx-auto">
           
-          {/* Tabs */}
-          <div className="mb-12 overflow-x-auto">
-            <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
-              <TabsList className="inline-flex min-w-full md:min-w-0 bg-gray-100 p-1">
-                {Object.keys(categoryNames).map(cat => (
-                  <TabsTrigger 
-                    key={cat} 
-                    value={cat}
-                    className="data-[state=active]:bg-white data-[state=active]:text-[var(--primary)]"
-                  >
+          {/* MENU DE CATEGORIAS (EFEITO DESLIZANTE) */}
+          <div className="mb-12 overflow-x-auto pb-4 scrollbar-hide">
+            <div className="flex bg-gray-100/80 p-1.5 rounded-full w-max mx-auto md:w-fit backdrop-blur-sm">
+              {Object.keys(categoryNames).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`
+                    relative px-6 py-2.5 rounded-full text-sm font-medium transition-colors duration-300 z-10
+                    ${selectedCategory === cat ? 'text-[var(--primary)]' : 'text-gray-500 hover:text-gray-700'}
+                  `}
+                  style={{ WebkitTapHighlightColor: "transparent" }}
+                >
+                  <span className="relative z-10">
                     {categoryNames[cat]}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+                  </span>
+                  {selectedCategory === cat && (
+                    <motion.div
+                      layoutId="activeTabGallery"
+                      className="absolute inset-0 bg-white rounded-full shadow-md"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                      style={{ zIndex: 0 }}
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
 
           {isLoading ? (
@@ -143,92 +150,98 @@ export default function Gallery() {
               <Loader2 className="animate-spin w-10 h-10 text-[var(--primary)]" />
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredImages.map((image, index) => (
-                <motion.div
-                  key={image.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="relative aspect-square rounded-lg overflow-hidden group cursor-pointer bg-gray-100"
-                  onClick={() => {
-                    setDirection(0);
-                    setSelectedIndex(index);
-                  }}
-                >
-                  <img 
-                    src={image.image_url}
-                    alt={image.title || "Trabalho Lusa Brasileira"}
-                    // object-top garante que cabeças não sejam cortadas na miniatura
-                    className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-500"
-                  />
-                  
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-4">
-                    <ZoomIn className="text-white w-8 h-8 mb-2 drop-shadow-lg" />
-                    {image.title && (
-                      <span className="text-white font-medium text-sm text-center drop-shadow-md">
-                        {image.title}
-                      </span>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+            <motion.div layout className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <AnimatePresence mode="popLayout">
+                {filteredImages.map((image, index) => (
+                  <motion.div
+                    layout
+                    key={image.id}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.4 }}
+                    className="relative aspect-square rounded-lg overflow-hidden group cursor-pointer bg-gray-100 shadow-sm hover:shadow-xl"
+                    onClick={() => {
+                      setDirection(0);
+                      setSelectedIndex(index);
+                    }}
+                  >
+                    <img 
+                      src={image.url}
+                      alt={image.title || "Trabalho Lusa Brasileira"}
+                      className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-700"
+                      loading="lazy"
+                    />
+                    
+                    {/* Overlay Hover */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-4 backdrop-blur-[2px]">
+                      <ZoomIn className="text-white w-10 h-10 mb-2 drop-shadow-lg transform scale-0 group-hover:scale-100 transition-transform duration-300 delay-100" />
+                      {image.title && (
+                        <span className="text-white font-medium text-sm text-center drop-shadow-md transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 delay-75">
+                          {image.title}
+                        </span>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </motion.div>
           )}
 
           {filteredImages.length === 0 && !isLoading && (
-            <div className="text-center py-16">
+            <div className="text-center py-20 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex flex-col items-center">
+              <ImageIcon className="w-12 h-12 text-gray-300 mb-3" />
               <p className="text-gray-500 text-lg">Nenhuma imagem encontrada nesta categoria.</p>
+              <Button 
+                variant="link" 
+                onClick={() => setSelectedCategory("todos")}
+                className="text-[var(--primary)] mt-2"
+              >
+                Ver todas as fotos
+              </Button>
             </div>
           )}
         </div>
       </section>
 
-      {/* --- LIGHTBOX (ZOOM) COM NAVEGAÇÃO E ARRASTAR --- */}
+      {/* --- LIGHTBOX (MODAL DE ZOOM) --- */}
       <AnimatePresence initial={false} custom={direction}>
         {selectedIndex !== null && currentImage && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-sm touch-none" // touch-none evita scroll da pagina
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-md touch-none"
             onClick={() => setSelectedIndex(null)}
           >
             {/* Botão Fechar */}
-            <button className="absolute top-4 right-4 text-white/70 hover:text-white p-2 z-50">
-              <X className="w-10 h-10" />
+            <button className="absolute top-4 right-4 text-white/70 hover:text-white p-2 z-50 bg-black/20 rounded-full hover:bg-black/50 transition-colors">
+              <X className="w-8 h-8" />
             </button>
 
-            {/* Botão Anterior (Esquerda) */}
+            {/* Setas Navegação Desktop */}
             <button
-              className="absolute left-2 md:left-8 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/60 text-white p-3 rounded-full z-50 transition-colors hidden md:block"
-              onClick={(e) => {
-                e.stopPropagation();
-                paginate(-1);
-              }}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white p-3 rounded-full z-50 transition-all hover:bg-white/10 hidden md:block"
+              onClick={(e) => { e.stopPropagation(); paginate(-1); }}
             >
-              <ChevronLeft className="w-8 h-8" />
+              <ChevronLeft className="w-10 h-10" />
             </button>
 
-            {/* Botão Próximo (Direita) */}
             <button
-              className="absolute right-2 md:right-8 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/60 text-white p-3 rounded-full z-50 transition-colors hidden md:block"
-              onClick={(e) => {
-                e.stopPropagation();
-                paginate(1);
-              }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white p-3 rounded-full z-50 transition-all hover:bg-white/10 hidden md:block"
+              onClick={(e) => { e.stopPropagation(); paginate(1); }}
             >
-              <ChevronRight className="w-8 h-8" />
+              <ChevronRight className="w-10 h-10" />
             </button>
 
-            {/* A Imagem com Animação e Arrastar */}
+            {/* Imagem */}
             <div 
-                className="w-full h-full flex items-center justify-center p-4"
-                onClick={(e) => e.stopPropagation()} // Clicar na área da imagem não fecha
+                className="w-full h-full flex items-center justify-center p-4 md:p-10"
+                onClick={(e) => e.stopPropagation()}
             >
                 <motion.img
-                    key={selectedIndex} // Chave muda = nova animação
-                    src={currentImage.image_url}
+                    key={selectedIndex}
+                    src={currentImage.url}
                     custom={direction}
                     variants={slideVariants}
                     initial="enter"
@@ -238,35 +251,34 @@ export default function Gallery() {
                         x: { type: "spring", stiffness: 300, damping: 30 },
                         opacity: { duration: 0.2 }
                     }}
-                    // --- CONFIGURAÇÃO DO ARRASTAR (SWIPE) ---
                     drag="x"
                     dragConstraints={{ left: 0, right: 0 }}
                     dragElastic={1}
                     onDragEnd={(e, { offset, velocity }) => {
                         const swipe = swipePower(offset.x, velocity.x);
                         if (swipe < -swipeConfidenceThreshold) {
-                            paginate(1); // Swipe Esquerda -> Próximo
+                            paginate(1);
                         } else if (swipe > swipeConfidenceThreshold) {
-                            paginate(-1); // Swipe Direita -> Anterior
+                            paginate(-1);
                         }
                     }}
-                    className="max-h-[85vh] max-w-[95vw] object-contain rounded-md shadow-2xl cursor-grab active:cursor-grabbing"
+                    className="max-h-[85vh] max-w-[95vw] object-contain rounded-md shadow-2xl cursor-grab active:cursor-grabbing select-none"
                     alt={currentImage.title}
                 />
             </div>
 
-            {/* Legenda Fixa em Baixo */}
-            {currentImage.title && (
-              <div className="absolute bottom-8 left-0 right-0 text-center pointer-events-none z-50">
-                <span className="text-white text-lg font-medium bg-black/60 px-6 py-2 rounded-full backdrop-blur-md">
-                  {currentImage.title}
-                </span>
-              </div>
-            )}
-            
-            {/* Indicador de Quantidade (Ex: 1 / 10) */}
-            <div className="absolute top-6 left-6 text-white/50 text-sm z-50">
+            {/* Info da Imagem */}
+            <div className="absolute bottom-8 left-0 right-0 text-center pointer-events-none z-50 px-4">
+              {currentImage.title && (
+                <div className="inline-block">
+                  <span className="text-white text-lg font-medium bg-black/60 px-6 py-2 rounded-full backdrop-blur-md border border-white/10 shadow-lg">
+                    {currentImage.title}
+                  </span>
+                </div>
+              )}
+              <div className="mt-2 text-white/40 text-sm">
                 {selectedIndex + 1} / {filteredImages.length}
+              </div>
             </div>
 
           </motion.div>
