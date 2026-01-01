@@ -321,7 +321,7 @@ export default function Contact() {
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between border-b border-white/10 pb-2">
                               <span>Seg, Qua, Qui, Sex</span>
-                              <span className="font-medium">10h - 18h</span>
+                              <span className="font-medium">10h - 17h</span>
                           </div>
                           <div className="flex justify-between border-b border-white/10 pb-2 text-red-200">
                               <span>Terça e Sábado</span>
