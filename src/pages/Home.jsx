@@ -430,7 +430,7 @@ export default function Home() {
                     </div>
                     <div>
                       <p className="font-semibold text-gray-900">Endereço</p>
-                      <p>Rua Exemplo, 123<br />1000-000 Lisboa</p>
+                      <p>Rua Porto de Baixo 69<br />3865-262 Salreu - Estarreja</p>
                     </div>
                   </div>
                   
@@ -440,7 +440,7 @@ export default function Home() {
                     </div>
                     <div>
                       <p className="font-semibold text-gray-900">Telefone</p>
-                      <p>+351 21 123 4567</p>
+                      <p>+351 91 542 9170</p>
                     </div>
                   </div>
 

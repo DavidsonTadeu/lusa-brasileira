@@ -373,7 +373,7 @@ export default function Layout({ children, currentPageName = "Home" }) {
                     <span className="font-medium text-white">09h - 19h</span>
                   </li>
                   <li className="flex justify-between items-center border-b border-white/5 pb-2 text-white/50">
-                    <span>Terça e Sábado</span>
+                    <span>Terça</span>
                     <span className="text-[var(--primary)] font-medium">Folga</span>
                   </li>
                   <li className="flex justify-between items-center text-white/50">
