@@ -369,7 +369,7 @@ export default function Layout({ children, currentPageName = "Home" }) {
                 <h4 className="text-lg font-serif font-bold mb-6 text-white border-b border-white/10 pb-2 inline-block">Horário</h4>
                 <ul className="space-y-3 text-sm text-gray-400">
                   <li className="flex justify-between items-center border-b border-white/5 pb-2">
-                    <span>Seg, Qua, Qui, Sex</span>
+                    <span>Seg, Qua, Qui, Sex, Sab</span>
                     <span className="font-medium text-white">09h - 19h</span>
                   </li>
                   <li className="flex justify-between items-center border-b border-white/5 pb-2 text-white/50">

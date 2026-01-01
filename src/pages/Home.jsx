@@ -447,9 +447,9 @@ export default function Home() {
                   <div className="pt-4 border-t border-gray-100">
                     <h4 className="font-semibold mb-2 text-gray-900">Horário de Funcionamento</h4>
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                        <p>Segunda - Sexta:</p> <p className="font-medium text-right">9h - 19h</p>
+                        <p>Segunda, Quarta - Sábado:</p> <p className="font-medium text-right">9h - 19h</p>
                     
-                        <p>Domingo:</p> <p className="text-red-500 font-medium text-right">Fechado</p>
+                        <p>Terça, Domingo:</p> <p className="text-red-500 font-medium text-right">Fechado</p>
                     </div>
                   </div>
                 </div>
