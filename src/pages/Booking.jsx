@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useSearchParams, Link } from "react-router-dom"; // Importei useSearchParams
+import { useSearchParams, Link } from "react-router-dom"; 
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -17,8 +17,8 @@ import { pt } from "date-fns/locale";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Booking() {
-  const [searchParams] = useSearchParams(); // Hook para ler a URL
-  const serviceIdFromUrl = searchParams.get("serviceId"); // Pega o ID da URL
+  const [searchParams] = useSearchParams(); 
+  const serviceIdFromUrl = searchParams.get("serviceId"); 
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -32,7 +32,7 @@ export default function Booking() {
     notes: ""
   });
   const [success, setSuccess] = useState(false);
-  const [hasAutoSelected, setHasAutoSelected] = useState(false); // Evita loop infinito
+  const [hasAutoSelected, setHasAutoSelected] = useState(false); 
 
   const { user, openLogin } = useAuth();
   const queryClient = useQueryClient();
@@ -43,9 +43,10 @@ export default function Booking() {
     return h * 60 + m;
   };
 
+  // Aqui pegamos todos os campos do serviço, inclusive o 'price_from'
   const { data: services = [], isLoading: isLoadingServices } = useQuery({ 
     queryKey: ['services'], 
-    queryFn: () => base44.entities.Service.filter({ is_active: true }, 'name') 
+    queryFn: () => base44.entities.Service.filter({ is_active: true }, '*') 
   });
   
   const { data: professionals = [] } = useQuery({ 
@@ -57,24 +58,20 @@ export default function Booking() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
 
-  // Define profissional padrão
   useEffect(() => { 
     if (professionals.length > 0 && !formData.professional_id) {
        setFormData(prev => ({ ...prev, professional_id: professionals[0].id })); 
     }
   }, [professionals]);
 
-  // --- LÓGICA DE AUTO-SELEÇÃO (A Mágica Acontece Aqui) ---
+  // --- LÓGICA DE AUTO-SELEÇÃO ---
   useEffect(() => {
     if (serviceIdFromUrl && services.length > 0 && !hasAutoSelected) {
       const serviceExists = services.find(s => s.id === serviceIdFromUrl);
       
       if (serviceExists) {
-        // Seleciona o serviço
         setFormData(prev => ({ ...prev, service_id: serviceIdFromUrl }));
-        // Pula direto para a etapa 2 (Data)
         setStep(2);
-        // Marca que já fez isso para não fazer de novo se o usuário voltar
         setHasAutoSelected(true);
       }
     }
@@ -108,10 +105,8 @@ export default function Booking() {
 
   const createBookingMutation = useMutation({
     mutationFn: async (bookingData) => {
-      // Cria o agendamento
       const booking = await base44.entities.Booking.create(bookingData);
       
-      // Tenta criar a notificação (se falhar, não impede o agendamento)
       try {
           const parts = bookingData.booking_date.split('-'); 
           const dateVisual = `${parts[2]}/${parts[1]}`; 
@@ -133,7 +128,6 @@ export default function Booking() {
         queryClient.invalidateQueries({ queryKey: ['bookings-for-calendar'] }); 
         setSuccess(true); 
     },
-    // ADICIONADO: Tratamento de erro visível
     onError: (error) => {
         console.error("Erro no agendamento:", error);
         alert(`Erro ao agendar: ${error.message || "Verifique os dados e tente novamente."}`);
@@ -233,50 +227,39 @@ export default function Booking() {
   const timeSlots = generateTimeSlots();
 
   const handleSubmit = () => {
-    // Verifica se está logado
     if (!user) { 
         openLogin(() => {}); 
         return; 
     }
     
-    // Formata a data manualmente para YYYY-MM-DD
     const d = formData.booking_date;
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     const dateStringManual = `${year}-${month}-${day}`;
 
-    // Prepara os dados corrigidos para o banco
     const bookingData = {
       service_id: formData.service_id,
       professional_id: formData.professional_id,
       booking_date: dateStringManual,
       booking_time: formData.booking_time,
-      
-      // CORREÇÃO: Usar client_id em vez de user_id
       client_id: user.id, 
-      
-      // Dados complementares
       client_name: formData.client_name || user.full_name,
       client_email: formData.client_email || user.email,
       client_phone: formData.client_phone || user.phone,
-      
       service_name: selectedService.name,
-      service_price: selectedService.price ? String(selectedService.price) : "0", // Garante que vai como string ou texto
+      service_price: selectedService.price ? String(selectedService.price) : "0", 
       professional_name: selectedProfessional?.name || "Ingrid",
       duration_minutes: selectedService.duration_minutes,
-      
       notes: formData.notes,
       status: 'pending'
     };
 
-    console.log("Enviando agendamento:", bookingData); // Para debug no console (F12)
     createBookingMutation.mutate(bookingData);
   };
 
   useEffect(() => { if (user && step === 3) setFormData(prev => ({ ...prev, client_name: user.full_name, client_email: user.email })); }, [user, step]);
 
-  // Variantes de Animação para os Passos
   const stepVariants = {
     initial: { opacity: 0, x: 20 },
     animate: { opacity: 1, x: 0 },
@@ -305,7 +288,7 @@ export default function Booking() {
             </Button>
           </a>
           <Button variant="ghost" className="mt-6 text-gray-500 hover:text-[var(--primary)]" onClick={() => { setFormData(prev => ({ ...prev, booking_date: null, booking_time: "", notes: "" })); setStep(1); setSuccess(false); setHasAutoSelected(false); }}>
-             Voltar ao Início
+              Voltar ao Início
           </Button>
         </motion.div>
       </div>
@@ -315,21 +298,21 @@ export default function Booking() {
   return (
     <div className="bg-gray-50 min-h-screen">
       
-      {/* HERO ANIMADO (Igual Home e Serviços) */}
+      {/* HERO ANIMADO */}
       <section className="relative h-64 md:h-80 w-full overflow-hidden">
          <motion.div 
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: 'url(img/ela5.png)' }}
-            initial={{ scale: 1.1, filter: 'brightness(0.5)' }}
-            animate={{ scale: 1, filter: 'brightness(0.6)' }}
-            transition={{ duration: 8, ease: "easeOut" }}
+           className="absolute inset-0 bg-cover bg-center"
+           style={{ backgroundImage: 'url(img/ela5.png)' }}
+           initial={{ scale: 1.1, filter: 'brightness(0.5)' }}
+           animate={{ scale: 1, filter: 'brightness(0.6)' }}
+           transition={{ duration: 8, ease: "easeOut" }}
          />
          <div className="absolute inset-0 bg-black/40" />
          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.8 }}
-            className="absolute inset-0 flex flex-col items-center justify-center text-white text-center px-4"
+           initial={{ opacity: 0, y: 20 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ delay: 0.2, duration: 0.8 }}
+           className="absolute inset-0 flex flex-col items-center justify-center text-white text-center px-4"
          >
            <h1 className="text-4xl md:text-5xl font-bold mb-2 shadow-sm drop-shadow-lg" style={{fontFamily: "'Playfair Display', serif"}}>
              Agende o Seu Momento
@@ -430,9 +413,17 @@ export default function Booking() {
                                       <Clock className="w-3 h-3 inline mr-1" /> {service.duration_minutes} min
                                     </p>
                                   </div>
-                                  <p className="font-bold text-lg whitespace-nowrap ml-4 text-[var(--primary)]">
-                                    {service.price ? `€${service.price.toFixed(2)}` : 'Consultar'}
-                                  </p>
+                                  <div className="text-right ml-4">
+                                      <p className="font-bold text-lg whitespace-nowrap text-[var(--primary)]">
+                                        {/* AQUI ESTÁ A CORREÇÃO DO PREÇO */}
+                                        {service.price ? (
+                                            <>
+                                              {service.price_from && <span className="text-xs font-normal text-gray-500 mr-1">desde</span>}
+                                              €{service.price.toFixed(2)}
+                                            </>
+                                        ) : 'Consultar'}
+                                      </p>
+                                  </div>
                                 </div>
                               </Label>
                             </div>
@@ -458,14 +449,14 @@ export default function Booking() {
                 {step === 2 && (
                   <div>
                     <div className="flex justify-between items-center mb-6">
-                       <h2 className="text-2xl font-bold flex items-center gap-3">
-                         <Clock className="w-6 h-6 text-[var(--primary)]" /> 
-                         Quando fica melhor para si?
-                       </h2>
-                       <div className="text-right">
-                          <p className="text-sm text-gray-500">Serviço escolhido:</p>
-                          <p className="font-semibold text-[var(--primary)]">{selectedService?.name}</p>
-                       </div>
+                        <h2 className="text-2xl font-bold flex items-center gap-3">
+                          <Clock className="w-6 h-6 text-[var(--primary)]" /> 
+                          Quando fica melhor para si?
+                        </h2>
+                        <div className="text-right">
+                           <p className="text-sm text-gray-500">Serviço escolhido:</p>
+                           <p className="font-semibold text-[var(--primary)]">{selectedService?.name}</p>
+                        </div>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-8">

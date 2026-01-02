@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, Phone, Mail, Clock, Send, CheckCircle, Loader2, ChevronDown, HelpCircle } from "lucide-react";
+import { MapPin, Phone, Mail, Clock, Send, CheckCircle, Loader2, ChevronDown, HelpCircle, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // --- DADOS DO FAQ ---
@@ -29,7 +29,7 @@ const faqs = [
   }
 ];
 
-// --- COMPONENTE INTERNO DE FAQ (Para não precisar de arquivo externo) ---
+// --- COMPONENTE INTERNO DE FAQ ---
 const FAQItem = ({ question, answer, isOpen, onClick }) => {
   return (
     <div className="border-b border-gray-100 last:border-0">
@@ -71,9 +71,9 @@ export default function Contact() {
     message: ""
   });
   const [success, setSuccess] = useState(false);
-  const [openFAQIndex, setOpenFAQIndex] = useState(null); // Controla qual pergunta está aberta
+  const [openFAQIndex, setOpenFAQIndex] = useState(null);
 
-  // MUTAÇÃO (Conecta ao Banco SQL)
+  // MUTAÇÃO
   const createMessageMutation = useMutation({
     mutationFn: async (data) => {
       return await base44.entities.ContactMessage.create({
@@ -84,6 +84,7 @@ export default function Contact() {
     onSuccess: () => {
       setSuccess(true);
       setFormData({ name: "", email: "", phone: "", message: "" });
+      // O pop-up some sozinho após 5 segundos
       setTimeout(() => setSuccess(false), 5000);
     },
     onError: (error) => {
@@ -103,8 +104,34 @@ export default function Contact() {
   };
 
   return (
-    <div className="bg-white min-h-screen">
+    <div className="bg-white min-h-screen relative">
       
+      {/* --- POP-UP (TOAST) DE SUCESSO --- */}
+      <AnimatePresence>
+        {success && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-5 right-5 z-50 max-w-sm w-full bg-white rounded-xl shadow-2xl border border-green-100 p-4 flex items-start gap-4"
+          >
+            <div className="bg-green-100 p-2 rounded-full flex-shrink-0">
+               <CheckCircle className="w-6 h-6 text-green-600" />
+            </div>
+            <div className="flex-1">
+               <h4 className="font-bold text-gray-900 text-lg">Mensagem Enviada!</h4>
+               <p className="text-gray-600 text-sm mt-1">
+                 Obrigada pelo contacto. Responderei o mais breve possível.
+               </p>
+            </div>
+            <button onClick={() => setSuccess(false)} className="text-gray-400 hover:text-gray-600">
+               <X className="w-5 h-5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* ---------------------------------- */}
+
       {/* HERO ANIMADO */}
       <section className="relative h-[40vh] flex items-center justify-center overflow-hidden">
         <motion.div 
@@ -158,21 +185,7 @@ export default function Contact() {
                 Tem alguma questão sobre os serviços ou gostaria de um orçamento personalizado? Preencha o formulário abaixo e responderei o mais breve possível.
               </p>
               
-              <AnimatePresence>
-                {success && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, height: 0 }}
-                    animate={{ opacity: 1, y: 0, height: 'auto' }}
-                    exit={{ opacity: 0, y: -10, height: 0 }}
-                    className="mb-6 overflow-hidden"
-                  >
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 text-green-800 shadow-sm">
-                        <CheckCircle className="w-5 h-5 flex-shrink-0" />
-                        <span className="font-medium">Mensagem enviada com sucesso! Entrarei em contacto em breve.</span>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {/* O alerta antigo foi removido daqui e virou o Pop-up lá em cima */}
               
               <form onSubmit={handleSubmit} className="space-y-5 bg-gray-50 p-8 rounded-2xl shadow-sm border border-gray-100">
                 <div>
@@ -235,7 +248,7 @@ export default function Contact() {
                 >
                   {createMessageMutation.isPending ? (
                     <>
-                       <Loader2 className="w-5 h-5 mr-2 animate-spin" /> A Enviar...
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" /> A Enviar...
                     </>
                   ) : (
                     <>
@@ -340,7 +353,7 @@ export default function Contact() {
             </motion.div>
           </div>
           
-          {/* FAQ SECTION (NOVO) */}
+          {/* FAQ SECTION */}
           <div className="mt-24 max-w-3xl mx-auto">
              <motion.div
                initial={{ opacity: 0, y: 30 }}
