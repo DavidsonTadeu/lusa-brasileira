@@ -39,11 +39,10 @@ export default function Booking() {
   const { user, openLogin } = useAuth();
   const queryClient = useQueryClient();
 
-  // --- CONFIGURAÇÃO DO EMAILJS (PREENCHA AQUI) ---
-  // Dica: O ideal é colocar isso no arquivo .env, mas pode por aqui para testar rápido
-  const EMAILJS_SERVICE_ID = "service_jykuowu";   // Ex: service_x9d8...
-  const EMAILJS_TEMPLATE_ID = "template_dzb0sgy"; // Ex: template_a4b...
-  const EMAILJS_PUBLIC_KEY = "m_gwAkI--BCVkIsrO";   // Ex: 5A_sD9...
+  // --- CONFIGURAÇÃO DO EMAILJS ---
+  const EMAILJS_SERVICE_ID = "service_jykuowu";
+  const EMAILJS_TEMPLATE_ID = "template_dzb0sgy";
+  const EMAILJS_PUBLIC_KEY = "m_gwAkI--BCVkIsrO";
 
   const getMinutesFromTime = (timeStr) => {
     if (!timeStr) return 0;
@@ -143,18 +142,15 @@ export default function Booking() {
             notes: bookingData.notes || "Sem observações"
         };
 
-        // Verifica se as chaves foram preenchidas antes de tentar enviar
-        if (EMAILJS_SERVICE_ID !== "service_jykuowu") {
-            await emailjs.send(
-                EMAILJS_SERVICE_ID,
-                EMAILJS_TEMPLATE_ID,
-                templateParams,
-                EMAILJS_PUBLIC_KEY
-            );
-            console.log("Email enviado com sucesso!");
-        } else {
-            console.warn("EmailJS não configurado. Adicione as chaves no código.");
-        }
+        // --- CORREÇÃO: Removemos o IF que bloqueava o envio ---
+        await emailjs.send(
+            EMAILJS_SERVICE_ID,
+            EMAILJS_TEMPLATE_ID,
+            templateParams,
+            EMAILJS_PUBLIC_KEY
+        );
+        console.log("Email enviado com sucesso!");
+
       } catch (emailErr) {
         console.error("Erro ao enviar email:", emailErr);
         // Não impedimos o sucesso do agendamento se o email falhar
