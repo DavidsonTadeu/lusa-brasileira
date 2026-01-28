@@ -144,7 +144,7 @@ export default function Booking() {
         };
 
         // Verifica se as chaves foram preenchidas antes de tentar enviar
-        if (EMAILJS_SERVICE_ID !== "SEU_SERVICE_ID_AQUI") {
+        if (EMAILJS_SERVICE_ID !== "service_jykuowu") {
             await emailjs.send(
                 EMAILJS_SERVICE_ID,
                 EMAILJS_TEMPLATE_ID,
