@@ -142,7 +142,6 @@ export default function Booking() {
             notes: bookingData.notes || "Sem observações"
         };
 
-        // --- CORREÇÃO: Removemos o IF que bloqueava o envio ---
         await emailjs.send(
             EMAILJS_SERVICE_ID,
             EMAILJS_TEMPLATE_ID,
@@ -153,7 +152,6 @@ export default function Booking() {
 
       } catch (emailErr) {
         console.error("Erro ao enviar email:", emailErr);
-        // Não impedimos o sucesso do agendamento se o email falhar
       }
 
       return booking;
@@ -186,6 +184,7 @@ export default function Booking() {
     return !workingHours || !workingHours.active;
   };
 
+  // --- LÓGICA DE GERAÇÃO DE HORÁRIOS ATUALIZADA ---
   const generateTimeSlots = () => {
     if (!formData.booking_date || !selectedProfessional || !selectedService) return [];
     
@@ -216,23 +215,30 @@ export default function Booking() {
       const slotStart = new Date(current);
       const slotEnd = addMinutes(slotStart, serviceDuration);
 
+      // Se o serviço termina depois do expediente, nem mostra a opção
       if (slotEnd > endOfDay) break;
 
       const timeStr = format(slotStart, 'HH:mm');
       let isAvailable = true;
 
+      // Não permite horários no passado (se for hoje)
       if (isToday && isBefore(slotStart, now)) {
         isAvailable = false;
       }
 
       if (isAvailable) {
         const myStartMins = getMinutesFromTime(timeStr);
+        // Calcula o minuto final do serviço desejado
+        const myEndMins = myStartMins + serviceDuration;
 
         for (const booking of bookings) {
           const bookStartMins = getMinutesFromTime(booking.booking_time);
           const bookEndMins = bookStartMins + (booking.duration_minutes || 60);
 
-          if (myStartMins >= bookStartMins && myStartMins < bookEndMins) {
+          // LÓGICA DE COLISÃO ATUALIZADA:
+          // Verifica se os intervalos de tempo se sobrepõem
+          // (Se o meu inicio é antes do fim dele E o inicio dele é antes do meu fim)
+          if (myStartMins < bookEndMins && bookStartMins < myEndMins) {
             isAvailable = false;
             break;
           }
@@ -241,11 +247,14 @@ export default function Booking() {
 
       if (isAvailable) {
         const myStartMins = getMinutesFromTime(timeStr);
+        const myEndMins = myStartMins + serviceDuration;
+
         for (const block of blockedSlots) {
           const blockStartMins = getMinutesFromTime(block.start_time);
           const blockEndMins = getMinutesFromTime(block.end_time);
           
-          if (myStartMins >= blockStartMins && myStartMins < blockEndMins) {
+          // Mesma lógica de colisão para bloqueios
+          if (myStartMins < blockEndMins && blockStartMins < myEndMins) {
             isAvailable = false;
             break;
           }
