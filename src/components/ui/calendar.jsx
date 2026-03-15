@@ -5,14 +5,15 @@ export const Calendar = ({ mode, selected, onSelect, className, disabled }) => {
     const val = e.target.value;
     if (!val) return;
     
-    // CORREÇÃO SÊNIOR: Trava a data no meio-dia local para blindar contra fuso horário.
-    // Assim, se a pessoa clica no dia 15, nunca vai voltar para o dia 14.
+    // Separa exatamente o ano, mes e dia da string (Ex: 2026-03-15)
     const [year, month, day] = val.split('-');
-    const date = new Date(year, parseInt(month) - 1, day, 12, 0, 0);
+    
+    // Cria a data no fuso local exato à meia-noite (00:00:00)
+    // Sem adicionar horas a mais!
+    const date = new Date(year, parseInt(month) - 1, day, 0, 0, 0);
     onSelect(date);
   };
 
-  // Formata a data escolhida para o padrão que o input nativo exige (YYYY-MM-DD)
   let dateStr = "";
   if (selected) {
     const y = selected.getFullYear();
@@ -21,7 +22,6 @@ export const Calendar = ({ mode, selected, onSelect, className, disabled }) => {
     dateStr = `${y}-${m}-${d}`;
   }
 
-  // Calcula a data de hoje para impedir que o cliente marque agendamentos no passado
   const today = new Date();
   const ty = today.getFullYear();
   const tm = String(today.getMonth() + 1).padStart(2, '0');
@@ -43,7 +43,7 @@ export const Calendar = ({ mode, selected, onSelect, className, disabled }) => {
       />
       
       <p className="text-xs text-gray-400 text-center mt-4 leading-tight">
-        * Nota: O calendário permite clicar em qualquer dia, mas se a data estiver indisponível, a lista de horários abaixo aparecerá vazia.
+        * Nota: Ao selecionar um dia de folga ou bloqueado, a lista de horários aparecerá vazia.
       </p>
     </div>
   );

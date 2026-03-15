@@ -18,12 +18,11 @@ import { useAuth } from "@/context/AuthContext";
 // --- IMPORTANTE: Importar o EmailJS ---
 import emailjs from '@emailjs/browser';
 
-// --- FORÇANDO O CALENDÁRIO PARA PORTUGAL (Segunda-feira) ---
 const ptPT = {
   ...pt,
   options: {
     ...pt.options,
-    weekStartsOn: 1, // 1 = Segunda-feira
+    weekStartsOn: 1, 
   }
 };
 
@@ -34,7 +33,8 @@ export default function Booking() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     service_id: "",
-    professional_id: "prof-1",
+    // ---> A GRANDE CORREÇÃO SÊNIOR: Deixando vazio para o site buscar o ID real no banco! <---
+    professional_id: "", 
     booking_date: null,
     booking_time: "",
     client_name: "",
@@ -48,7 +48,6 @@ export default function Booking() {
   const { user, openLogin } = useAuth();
   const queryClient = useQueryClient();
 
-  // --- CONFIGURAÇÃO DO EMAILJS ---
   const EMAILJS_SERVICE_ID = "service_jykuowu";
   const EMAILJS_TEMPLATE_ID = "template_dzb0sgy";
   const EMAILJS_PUBLIC_KEY = "m_gwAkI--BCVkIsrO";
@@ -64,7 +63,6 @@ export default function Booking() {
     queryFn: () => base44.entities.Service.filter({ is_active: true }, '*') 
   });
   
-  // CORREÇÃO SÊNIOR: refetchOnWindowFocus limpa o cache e busca dados frescos!
   const { data: professionals = [] } = useQuery({ 
     queryKey: ['professionals'], 
     queryFn: () => base44.entities.Professional.filter({ is_active: true }, '*'),
@@ -75,6 +73,7 @@ export default function Booking() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
 
+  // Quando os profissionais carregarem, injeta o ID REAL do primeiro da lista (A Ingrid)
   useEffect(() => { 
     if (professionals.length > 0 && !formData.professional_id) {
        setFormData(prev => ({ ...prev, professional_id: professionals[0].id })); 
@@ -106,7 +105,6 @@ export default function Booking() {
     refetchOnWindowFocus: true
   });
 
-  // CORREÇÃO SÊNIOR: Buscar TODOS os bloqueios para fugir do bug de data do banco
   const { data: blockedSlots = [] } = useQuery({
     queryKey: ['blocked-slots-booking', formData.professional_id],
     queryFn: () => {
@@ -127,7 +125,7 @@ export default function Booking() {
           const parts = bookingData.booking_date.split('-'); 
           const dateVisual = `${parts[2]}/${parts[1]}`; 
           await base44.entities.Notification.create({
-            user_id: 'prof-1', 
+            user_id: formData.professional_id, 
             type: 'info', 
             title: 'Novo Pedido de Agendamento',
             message: `${bookingData.client_name} - ${bookingData.service_name} - ${dateVisual} às ${bookingData.booking_time}.`,
@@ -158,8 +156,6 @@ export default function Booking() {
             templateParams,
             EMAILJS_PUBLIC_KEY
         );
-        console.log("Email enviado com sucesso!");
-
       } catch (emailErr) {
         console.error("Erro ao enviar email:", emailErr);
       }
@@ -171,7 +167,6 @@ export default function Booking() {
         setSuccess(true); 
     },
     onError: (error) => {
-        console.error("Erro no agendamento:", error);
         alert(`Erro ao agendar: ${error.message || "Verifique os dados e tente novamente."}`);
     }
   });
@@ -188,8 +183,7 @@ export default function Booking() {
 
   const isDayDisabled = (date) => {
     if (isBefore(date, startOfDay(new Date()))) return true;
-    const safeCheck = new Date(date.getTime() + (12 * 60 * 60 * 1000));
-    const dayKey = getSafeDayKey(safeCheck);
+    const dayKey = getSafeDayKey(date);
     
     let profHours = selectedProfessional?.working_hours;
     if (typeof profHours === 'string') {
@@ -200,7 +194,6 @@ export default function Booking() {
     return !workingHours || !workingHours.active;
   };
 
-  // --- LÓGICA DE GERAÇÃO DE HORÁRIOS BLINDADA ---
   const generateTimeSlots = () => {
     if (!formData.booking_date || !selectedProfessional || !selectedService) return [];
     
@@ -213,7 +206,7 @@ export default function Booking() {
     }
     const workingHours = profHours?.[dayKey];
     
-    // Se o dia está inativo (como a Segunda-feira configurada), retorna vazio imediatamente!
+    // Se o dia não estiver ativo no banco real, ele barra tudo na hora!
     if (!workingHours?.active) return [];
     
     const [startHour, startMin] = (workingHours.start || "10:00").split(':').map(Number);
@@ -232,7 +225,7 @@ export default function Booking() {
       formData.booking_date.getFullYear() === now.getFullYear();
 
     const serviceDuration = selectedService.duration_minutes || 60;
-    const targetDateStr = format(formData.booking_date, 'yyyy-MM-dd'); // Ex: "2026-03-15"
+    const targetDateStr = format(formData.booking_date, 'yyyy-MM-dd'); 
 
     while (current < endOfDay) {
       const slotStart = new Date(current);
@@ -247,7 +240,6 @@ export default function Booking() {
         isAvailable = false;
       }
 
-      // Verificação de Bookings Existentes
       if (isAvailable) {
         const myStartMins = getMinutesFromTime(timeStr);
         const myEndMins = myStartMins + serviceDuration;
@@ -263,19 +255,16 @@ export default function Booking() {
         }
       }
 
-      // Verificação BLINDADA de Bloqueios Admin (Feriados/Folgas)
       if (isAvailable) {
         const myStartMins = getMinutesFromTime(timeStr);
         const myEndMins = myStartMins + serviceDuration;
 
         for (const block of blockedSlots) {
-          // Corta sujeira do banco de dados (ex: "2026-03-15T00:00:00" vira "2026-03-15")
           let safeBlockDateStr = block.date;
           if (safeBlockDateStr && safeBlockDateStr.includes('T')) {
              safeBlockDateStr = safeBlockDateStr.split('T')[0];
           }
           
-          // Se o bloqueio for no dia selecionado...
           if (safeBlockDateStr === targetDateStr) {
             const blockStartMins = getMinutesFromTime(block.start_time || "00:00");
             const blockEndMins = getMinutesFromTime(block.end_time || "23:59");
@@ -368,7 +357,6 @@ export default function Booking() {
   return (
     <div className="bg-gray-50 min-h-screen">
       
-      {/* HERO ANIMADO */}
       <section className="relative h-64 md:h-80 w-full overflow-hidden">
          <motion.div 
            className="absolute inset-0 bg-cover bg-center"
@@ -396,7 +384,6 @@ export default function Booking() {
       <div className="px-4 pb-12 -mt-16 relative z-10">
         <div className="max-w-4xl mx-auto">
           
-          {/* AVISO IMPORTANTE */}
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -410,7 +397,6 @@ export default function Booking() {
             </p>
           </motion.div>
 
-          {/* INDICADOR DE PASSOS */}
           <Card className="mb-8 p-6 shadow-xl border-t-4 border-[var(--primary)]">
             <div className="flex items-center justify-center gap-4">
               {[1, 2, 3].map((s) => (
@@ -442,7 +428,6 @@ export default function Booking() {
             </div>
           </Card>
 
-          {/* FORMULÁRIO MULTI-ETAPAS */}
           <AnimatePresence mode="wait">
             <motion.div 
               key={step} 
@@ -454,7 +439,6 @@ export default function Booking() {
             >
               <Card className="p-8 shadow-lg bg-white/95 backdrop-blur-sm">
                 
-                {/* --- ETAPA 1: ESCOLHA DO SERVIÇO --- */}
                 {step === 1 && (
                   <div>
                     <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
@@ -514,7 +498,6 @@ export default function Booking() {
                   </div>
                 )}
 
-                {/* --- ETAPA 2: DATA E HORA --- */}
                 {step === 2 && (
                   <div>
                     <div className="flex justify-between items-center mb-6">
@@ -536,8 +519,7 @@ export default function Booking() {
                           selected={formData.booking_date} 
                           onSelect={(date) => {
                              if (!date) return;
-                             const safeDate = new Date(date.getTime() + (12 * 60 * 60 * 1000));
-                             setFormData({...formData, booking_date: safeDate, booking_time: ""})
+                             setFormData({...formData, booking_date: date, booking_time: ""})
                           }} 
                           disabled={isDayDisabled} 
                           locale={ptPT}
@@ -599,7 +581,6 @@ export default function Booking() {
                   </div>
                 )}
 
-                {/* --- ETAPA 3: DADOS FINAIS --- */}
                 {step === 3 && (
                   <div>
                     <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
