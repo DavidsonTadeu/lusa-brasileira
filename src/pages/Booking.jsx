@@ -64,9 +64,10 @@ export default function Booking() {
     queryFn: () => base44.entities.Service.filter({ is_active: true }, '*') 
   });
   
+  // ---> CORREÇÃO SÊNIOR AQUI: Trocado 'name' por '*' para trazer os horários do banco <---
   const { data: professionals = [] } = useQuery({ 
     queryKey: ['professionals'], 
-    queryFn: () => base44.entities.Professional.filter({ is_active: true }, 'name') 
+    queryFn: () => base44.entities.Professional.filter({ is_active: true }, '*') 
   });
 
   useEffect(() => {
@@ -117,10 +118,8 @@ export default function Booking() {
 
   const createBookingMutation = useMutation({
     mutationFn: async (bookingData) => {
-      // 1. Cria no Banco de Dados
       const booking = await base44.entities.Booking.create(bookingData);
       
-      // 2. Cria Notificação no Sininho (Supabase)
       try {
           const parts = bookingData.booking_date.split('-'); 
           const dateVisual = `${parts[2]}/${parts[1]}`; 
@@ -136,10 +135,9 @@ export default function Booking() {
           console.warn("Erro ao criar notificação interna:", err);
       }
 
-      // 3. Envia E-mail (EmailJS)
       try {
         const parts = bookingData.booking_date.split('-'); 
-        const dateVisual = `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
+        const dateVisual = `${parts[2]}/${parts[1]}/${parts[0]}`; 
 
         const templateParams = {
             client_name: bookingData.client_name,
@@ -185,11 +183,18 @@ export default function Booking() {
     return dayKeys[dayIndex];
   };
 
+  // ---> CORREÇÃO SÊNIOR: Garantindo leitura correta dos dias de folga <---
   const isDayDisabled = (date) => {
     if (isBefore(date, startOfDay(new Date()))) return true;
     const safeCheck = new Date(date.getTime() + (12 * 60 * 60 * 1000));
     const dayKey = getSafeDayKey(safeCheck);
-    const workingHours = selectedProfessional?.working_hours?.[dayKey];
+    
+    let profHours = selectedProfessional?.working_hours;
+    if (typeof profHours === 'string') {
+        try { profHours = JSON.parse(profHours); } catch(e) { profHours = {}; }
+    }
+    
+    const workingHours = profHours?.[dayKey];
     return !workingHours || !workingHours.active;
   };
 
@@ -199,7 +204,13 @@ export default function Booking() {
     
     const slots = [];
     const dayKey = getSafeDayKey(formData.booking_date);
-    const workingHours = selectedProfessional.working_hours?.[dayKey];
+    
+    // ---> CORREÇÃO SÊNIOR: Leitura segura do JSON de horários <---
+    let profHours = selectedProfessional.working_hours;
+    if (typeof profHours === 'string') {
+        try { profHours = JSON.parse(profHours); } catch(e) { profHours = {}; }
+    }
+    const workingHours = profHours?.[dayKey];
     
     if (!workingHours?.active) return [];
     
@@ -253,12 +264,18 @@ export default function Booking() {
         const myEndMins = myStartMins + serviceDuration;
 
         for (const block of blockedSlots) {
-          const blockStartMins = getMinutesFromTime(block.start_time);
-          const blockEndMins = getMinutesFromTime(block.end_time);
+          // Compensando o fuso horário no bloqueio também
+          let safeBlockDateStr = block.date;
+          if (safeBlockDateStr.includes('T')) safeBlockDateStr = safeBlockDateStr.split('T')[0];
           
-          if (myStartMins < blockEndMins && blockStartMins < myEndMins) {
-            isAvailable = false;
-            break;
+          if (safeBlockDateStr === format(formData.booking_date, 'yyyy-MM-dd')) {
+            const blockStartMins = getMinutesFromTime(block.start_time);
+            const blockEndMins = getMinutesFromTime(block.end_time);
+            
+            if (myStartMins < blockEndMins && blockStartMins < myEndMins) {
+              isAvailable = false;
+              break;
+            }
           }
         }
       }
@@ -515,7 +532,7 @@ export default function Booking() {
                              setFormData({...formData, booking_date: safeDate, booking_time: ""})
                           }} 
                           disabled={isDayDisabled} 
-                          locale={ptPT} /* <--- Aqui está a mágica forçando a Segunda-feira */
+                          locale={ptPT}
                           className="border rounded-lg p-3 w-full flex justify-center bg-white shadow-sm" 
                         />
                       </div>

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Clock, Plus, Trash2, Calendar as CalendarIcon, Loader2, XCircle } from "lucide-react";
-import { format, parse } from "date-fns";
+import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { motion } from "framer-motion";
 
@@ -26,7 +26,7 @@ const daysOfWeek = [
 export default function AdminScheduleSettings() {
   const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
   const [blockFormData, setBlockFormData] = useState({
-    date: null,
+    date: "", // Correção Sênior: Usar string pura para evitar Bug de Fuso Horário
     start_time: "09:00",
     end_time: "10:00",
     reason: "",
@@ -59,6 +59,7 @@ export default function AdminScheduleSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['professionals-schedule'] });
     },
+    onError: (err) => alert("Erro ao salvar horário: " + err.message)
   });
 
   const createBlockMutation = useMutation({
@@ -67,7 +68,7 @@ export default function AdminScheduleSettings() {
       queryClient.invalidateQueries({ queryKey: ['blocked-slots'] });
       setIsBlockDialogOpen(false);
       setBlockFormData({
-        date: null,
+        date: "",
         start_time: "09:00",
         end_time: "10:00",
         reason: "",
@@ -87,10 +88,20 @@ export default function AdminScheduleSettings() {
   const handleWorkingHoursChange = (day, field, value) => {
     if (!selectedProfessional) return;
 
+    // Correção Sênior: Garantir que o JSON não quebre ao salvar as chaves de dias
+    let currentHours = selectedProfessional.working_hours;
+    if (typeof currentHours === 'string') {
+        try { currentHours = JSON.parse(currentHours); } catch (e) { currentHours = {}; }
+    }
+    if (!currentHours) currentHours = {};
+
+    const dayDefaults = { start: "10:00", end: "18:00", active: true };
+    const currentDay = currentHours[day] || dayDefaults;
+
     const updatedHours = {
-      ...selectedProfessional.working_hours,
+      ...currentHours,
       [day]: {
-        ...(selectedProfessional.working_hours?.[day] || {}),
+        ...currentDay,
         [field]: value
       }
     };
@@ -106,11 +117,10 @@ export default function AdminScheduleSettings() {
 
     createBlockMutation.mutate({
       professional_id: selectedProfessional.id,
-      date: format(blockFormData.date, 'yyyy-MM-dd'),
+      date: blockFormData.date, // Passa a data string perfeitamente, sem o offset UTC
       start_time: blockFormData.start_time,
       end_time: blockFormData.end_time,
       reason: blockFormData.reason,
-      // is_recurring: blockFormData.is_recurring // Só envie se tiver a coluna no banco
     });
   };
 
@@ -230,52 +240,57 @@ export default function AdminScheduleSettings() {
                       <p className="text-gray-600 text-sm">Sua agenda seguirá o horário padrão.</p>
                     </div>
                 ) : (
-                  blockedSlots.map((slot) => (
-                    <motion.div
-                      key={slot.id}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center justify-between p-4 bg-gray-900 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-1">
-                          <div className="p-2 bg-gray-800 rounded text-gray-400">
-                             <CalendarIcon className="w-4 h-4" />
-                          </div>
-                          <div>
-                              <p className="text-white font-bold capitalize">
-                                {format(new Date(slot.date), "dd 'de' MMMM, yyyy", { locale: pt })}
-                              </p>
-                              <div className="flex items-center gap-2 text-sm text-[var(--primary)] font-medium">
-                                <Clock className="w-3 h-3" />
-                                <span>{slot.start_time} - {slot.end_time}</span>
-                              </div>
+                  blockedSlots.map((slot) => {
+                    // Correção Sênior: Força a data para o meio-dia local para não virar o dia anterior na leitura
+                    const safeDateStr = slot.date.split('T')[0] + 'T12:00:00';
+
+                    return (
+                      <motion.div
+                        key={slot.id}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center justify-between p-4 bg-gray-900 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-1">
+                            <div className="p-2 bg-gray-800 rounded text-gray-400">
+                               <CalendarIcon className="w-4 h-4" />
+                            </div>
+                            <div>
+                                <p className="text-white font-bold capitalize">
+                                  {format(new Date(safeDateStr), "dd 'de' MMMM, yyyy", { locale: pt })}
+                                </p>
+                                <div className="flex items-center gap-2 text-sm text-[var(--primary)] font-medium">
+                                  <Clock className="w-3 h-3" />
+                                  <span>{slot.start_time} - {slot.end_time}</span>
+                                </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-4">
-                          {slot.reason && (
-                            <span className="hidden md:inline-block px-3 py-1 bg-gray-800 text-gray-300 text-xs rounded-full border border-gray-700">
-                              {slot.reason}
-                            </span>
-                          )}
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => deleteBlockMutation.mutate(slot.id)}
-                            className="text-gray-500 hover:text-red-500 hover:bg-red-900/20"
-                            title="Remover Bloqueio"
-                          >
-                            {deleteBlockMutation.isPending && deleteBlockMutation.variables === slot.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <Trash2 className="w-4 h-4" />
+                        <div className="flex items-center gap-4">
+                            {slot.reason && (
+                              <span className="hidden md:inline-block px-3 py-1 bg-gray-800 text-gray-300 text-xs rounded-full border border-gray-700">
+                                {slot.reason}
+                              </span>
                             )}
-                          </Button>
-                      </div>
-                    </motion.div>
-                  ))
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => deleteBlockMutation.mutate(slot.id)}
+                              className="text-gray-500 hover:text-red-500 hover:bg-red-900/20"
+                              title="Remover Bloqueio"
+                            >
+                              {deleteBlockMutation.isPending && deleteBlockMutation.variables === slot.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                  <Trash2 className="w-4 h-4" />
+                              )}
+                            </Button>
+                        </div>
+                      </motion.div>
+                    );
+                  })
                 )}
               </div>
             </Card>
@@ -283,7 +298,6 @@ export default function AdminScheduleSettings() {
         </Tabs>
       </div>
 
-      {/* DIALOG DE CRIAR BLOQUEIO - CORRIGIDO AQUI */}
       <Dialog open={isBlockDialogOpen} onOpenChange={setIsBlockDialogOpen}>
         <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-md">
           <DialogHeader>
@@ -293,14 +307,10 @@ export default function AdminScheduleSettings() {
           <div className="space-y-4 py-4">
             <div>
                <Label className="text-gray-300 mb-2 block">Selecionar Data</Label>
-               {/* SUBSTITUIÇÃO PELO INPUT NATIVO COM ESTILO DARK */}
                <input 
                   type="date"
-                  value={blockFormData.date ? format(blockFormData.date, 'yyyy-MM-dd') : ''}
-                  onChange={(e) => {
-                    const d = e.target.value ? parse(e.target.value, 'yyyy-MM-dd', new Date()) : null;
-                    setBlockFormData({...blockFormData, date: d});
-                  }}
+                  value={blockFormData.date}
+                  onChange={(e) => setBlockFormData({...blockFormData, date: e.target.value})}
                   className="w-full bg-gray-700 border border-gray-600 text-white rounded p-2.5 [color-scheme:dark] focus:border-[var(--primary)] outline-none cursor-pointer"
                />
             </div>
