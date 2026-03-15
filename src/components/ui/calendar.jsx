@@ -5,11 +5,8 @@ export const Calendar = ({ mode, selected, onSelect, className, disabled }) => {
     const val = e.target.value;
     if (!val) return;
     
-    // Separa exatamente o ano, mes e dia da string (Ex: 2026-03-15)
+    // Lógica blindada da data
     const [year, month, day] = val.split('-');
-    
-    // Cria a data no fuso local exato à meia-noite (00:00:00)
-    // Sem adicionar horas a mais!
     const date = new Date(year, parseInt(month) - 1, day, 0, 0, 0);
     onSelect(date);
   };
@@ -29,22 +26,18 @@ export const Calendar = ({ mode, selected, onSelect, className, disabled }) => {
   const minDate = `${ty}-${tm}-${td}`;
 
   return (
-    <div className={`p-4 border border-gray-200 rounded-xl bg-white shadow-sm ${className}`}>
-      <p className="text-sm text-[var(--primary)] mb-3 text-center font-bold uppercase tracking-wider">
-        Toque para escolher a data:
-      </p>
+    <div className={`w-full ${className}`}>
+      <label className="block text-sm font-semibold text-gray-700 mb-2 ml-1">
+        Escolha a data
+      </label>
       
       <input 
         type="date" 
-        className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-800 font-medium cursor-pointer focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none transition-all"
+        className="w-full h-14 px-4 border border-gray-200 rounded-xl bg-white text-gray-900 font-medium text-[16px] shadow-sm cursor-pointer hover:border-gray-300 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none transition-all"
         value={dateStr}
         onChange={handleChange}
         min={minDate} 
       />
-      
-      <p className="text-xs text-gray-400 text-center mt-4 leading-tight">
-        * Nota: Ao selecionar um dia de folga ou bloqueado, a lista de horários aparecerá vazia.
-      </p>
     </div>
   );
 };
