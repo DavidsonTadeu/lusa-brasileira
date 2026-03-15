@@ -64,10 +64,11 @@ export default function Booking() {
     queryFn: () => base44.entities.Service.filter({ is_active: true }, '*') 
   });
   
-  // ---> CORREÇÃO SÊNIOR AQUI: Trocado 'name' por '*' para trazer os horários do banco <---
+  // CORREÇÃO SÊNIOR: refetchOnWindowFocus limpa o cache e busca dados frescos!
   const { data: professionals = [] } = useQuery({ 
     queryKey: ['professionals'], 
-    queryFn: () => base44.entities.Professional.filter({ is_active: true }, '*') 
+    queryFn: () => base44.entities.Professional.filter({ is_active: true }, '*'),
+    refetchOnWindowFocus: true 
   });
 
   useEffect(() => {
@@ -102,18 +103,20 @@ export default function Booking() {
       return allBookings.filter(b => ['pending', 'confirmed'].includes(b.status));
     },
     enabled: !!formData.professional_id && !!formData.booking_date,
+    refetchOnWindowFocus: true
   });
 
+  // CORREÇÃO SÊNIOR: Buscar TODOS os bloqueios para fugir do bug de data do banco
   const { data: blockedSlots = [] } = useQuery({
-    queryKey: ['blocked-slots-booking', formData.professional_id, formData.booking_date],
+    queryKey: ['blocked-slots-booking', formData.professional_id],
     queryFn: () => {
-      if (!formData.professional_id || !formData.booking_date) return [];
+      if (!formData.professional_id) return [];
       return base44.entities.BlockedSlot.filter({
-        professional_id: formData.professional_id,
-        date: format(formData.booking_date, 'yyyy-MM-dd')
+        professional_id: formData.professional_id
       });
     },
-    enabled: !!formData.professional_id && !!formData.booking_date,
+    enabled: !!formData.professional_id,
+    refetchOnWindowFocus: true
   });
 
   const createBookingMutation = useMutation({
@@ -183,7 +186,6 @@ export default function Booking() {
     return dayKeys[dayIndex];
   };
 
-  // ---> CORREÇÃO SÊNIOR: Garantindo leitura correta dos dias de folga <---
   const isDayDisabled = (date) => {
     if (isBefore(date, startOfDay(new Date()))) return true;
     const safeCheck = new Date(date.getTime() + (12 * 60 * 60 * 1000));
@@ -198,20 +200,20 @@ export default function Booking() {
     return !workingHours || !workingHours.active;
   };
 
-  // --- LÓGICA DE GERAÇÃO DE HORÁRIOS ---
+  // --- LÓGICA DE GERAÇÃO DE HORÁRIOS BLINDADA ---
   const generateTimeSlots = () => {
     if (!formData.booking_date || !selectedProfessional || !selectedService) return [];
     
     const slots = [];
     const dayKey = getSafeDayKey(formData.booking_date);
     
-    // ---> CORREÇÃO SÊNIOR: Leitura segura do JSON de horários <---
     let profHours = selectedProfessional.working_hours;
     if (typeof profHours === 'string') {
         try { profHours = JSON.parse(profHours); } catch(e) { profHours = {}; }
     }
     const workingHours = profHours?.[dayKey];
     
+    // Se o dia está inativo (como a Segunda-feira configurada), retorna vazio imediatamente!
     if (!workingHours?.active) return [];
     
     const [startHour, startMin] = (workingHours.start || "10:00").split(':').map(Number);
@@ -230,6 +232,7 @@ export default function Booking() {
       formData.booking_date.getFullYear() === now.getFullYear();
 
     const serviceDuration = selectedService.duration_minutes || 60;
+    const targetDateStr = format(formData.booking_date, 'yyyy-MM-dd'); // Ex: "2026-03-15"
 
     while (current < endOfDay) {
       const slotStart = new Date(current);
@@ -244,6 +247,7 @@ export default function Booking() {
         isAvailable = false;
       }
 
+      // Verificação de Bookings Existentes
       if (isAvailable) {
         const myStartMins = getMinutesFromTime(timeStr);
         const myEndMins = myStartMins + serviceDuration;
@@ -259,18 +263,22 @@ export default function Booking() {
         }
       }
 
+      // Verificação BLINDADA de Bloqueios Admin (Feriados/Folgas)
       if (isAvailable) {
         const myStartMins = getMinutesFromTime(timeStr);
         const myEndMins = myStartMins + serviceDuration;
 
         for (const block of blockedSlots) {
-          // Compensando o fuso horário no bloqueio também
+          // Corta sujeira do banco de dados (ex: "2026-03-15T00:00:00" vira "2026-03-15")
           let safeBlockDateStr = block.date;
-          if (safeBlockDateStr.includes('T')) safeBlockDateStr = safeBlockDateStr.split('T')[0];
+          if (safeBlockDateStr && safeBlockDateStr.includes('T')) {
+             safeBlockDateStr = safeBlockDateStr.split('T')[0];
+          }
           
-          if (safeBlockDateStr === format(formData.booking_date, 'yyyy-MM-dd')) {
-            const blockStartMins = getMinutesFromTime(block.start_time);
-            const blockEndMins = getMinutesFromTime(block.end_time);
+          // Se o bloqueio for no dia selecionado...
+          if (safeBlockDateStr === targetDateStr) {
+            const blockStartMins = getMinutesFromTime(block.start_time || "00:00");
+            const blockEndMins = getMinutesFromTime(block.end_time || "23:59");
             
             if (myStartMins < blockEndMins && blockStartMins < myEndMins) {
               isAvailable = false;
