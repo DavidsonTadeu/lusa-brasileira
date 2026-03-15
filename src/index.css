@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #B22222; /* Sua cor vermelha original (MANTIDA) */
+}
+
+/* --- CORREÇÃO DE SCROLL LATERAL (MOBILE) --- */
+html, body {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden; /* Corta o que vazar para os lados */
+  position: relative;
+  margin: 0;
+  padding: 0;
+  scroll-behavior: smooth; /* Bônus: Deixa a rolagem da página mais suave */
+}
+
+#root {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
