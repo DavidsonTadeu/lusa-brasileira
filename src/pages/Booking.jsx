@@ -18,6 +18,15 @@ import { useAuth } from "@/context/AuthContext";
 // --- IMPORTANTE: Importar o EmailJS ---
 import emailjs from '@emailjs/browser';
 
+// --- FORÇANDO O CALENDÁRIO PARA PORTUGAL (Segunda-feira) ---
+const ptPT = {
+  ...pt,
+  options: {
+    ...pt.options,
+    weekStartsOn: 1, // 1 = Segunda-feira
+  }
+};
+
 export default function Booking() {
   const [searchParams] = useSearchParams(); 
   const serviceIdFromUrl = searchParams.get("serviceId"); 
@@ -506,8 +515,7 @@ export default function Booking() {
                              setFormData({...formData, booking_date: safeDate, booking_time: ""})
                           }} 
                           disabled={isDayDisabled} 
-                          locale={pt} 
-                          weekStartsOn={1} /* <-- ADICIONADO AQUI: FORÇA O INÍCIO DA SEMANA NA SEGUNDA-FEIRA */
+                          locale={ptPT} /* <--- Aqui está a mágica forçando a Segunda-feira */
                           className="border rounded-lg p-3 w-full flex justify-center bg-white shadow-sm" 
                         />
                       </div>
