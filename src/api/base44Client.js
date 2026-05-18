@@ -73,52 +73,63 @@ const sanitizePayload = (entityName, rawData) => {
 
 export const base44 = {
   auth: {
-    me: async () => JSON.parse(localStorage.getItem('user_session')),
+    me: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return null;
+      
+      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+      const { data } = await supabase.from('professionals').select('*').eq('email', session.user.email).single();
+      
+      if (data) return data;
+      if (session.user.email?.toLowerCase() === adminEmail?.toLowerCase()) {
+          return { id: session.user.id, role: 'admin', full_name: 'Administrador', email: adminEmail };
+      }
+      return { id: session.user.id, email: session.user.email, role: 'client' };
+    },
     
     login: async (email, password) => {
-      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-      const adminPass = import.meta.env.VITE_ADMIN_PASSWORD;
-
-      // Login Administrativo
-      if (email.trim().toLowerCase() === adminEmail?.toLowerCase() && password.trim() === adminPass) {
-        const user = { id: 'prof-1', role: 'admin', full_name: 'Ingrid (Admin)', email: adminEmail };
-        localStorage.setItem('user_session', JSON.stringify(user));
-        return user;
-      }
-
-      // Login de Utilizadores/Clientes
-      const { data, error } = await supabase
-        .from('professionals')
-        .select('*')
-        .eq('email', email)
-        .eq('password', password)
-        .single();
-
+      // Login utilizando Supabase Auth (Seguro, sem senhas no frontend)
+      const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
+      
       if (error) throw new Error("Credenciais inválidas ou conta inexistente.");
       
-      localStorage.setItem('user_session', JSON.stringify(data));
-      return data;
+      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+      const { data: profData } = await supabase.from('professionals').select('*').eq('email', email).single();
+      
+      if (profData) return profData;
+      if (email.trim().toLowerCase() === adminEmail?.toLowerCase()) {
+        return { id: authData.user.id, role: 'admin', full_name: 'Administrador', email };
+      }
+
+      return { id: authData.user.id, email: authData.user.email, role: 'client' };
     },
 
-    // --- AQUI ESTÁ A CORREÇÃO: ADICIONAMOS A FUNÇÃO REGISTER ---
     register: async (userData) => {
-      // Verifica se o email já existe antes de tentar criar
+      // Registra o usuário no sistema de autenticação oficial do Supabase
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+      });
+
+      if (authError) throw new Error("Erro ao criar conta: " + authError.message);
+
+      // Verifica se o email já existe na tabela professionals (redundância)
       const { data: existing } = await supabase
         .from('professionals')
         .select('id')
         .eq('email', userData.email);
 
       if (existing && existing.length > 0) {
-        throw new Error("Este e-mail já está registado.");
+        throw new Error("Este e-mail já está registado nos perfis.");
       }
 
       // Prepara os dados do novo cliente
       const newClient = {
         full_name: userData.full_name,
         email: userData.email,
-        password: userData.password,
-        role: 'client',      // Define como cliente padrão
-        phone: '',           // Campos vazios para evitar erro no CRM
+        password: userData.password, // Mantido apenas para compatibilidade legada com rotinas antigas, caso existam
+        role: 'client',
+        phone: '',
         preferences: '',
         allergies: ''
       };
@@ -129,14 +140,15 @@ export const base44 = {
         .select()
         .single();
 
-      if (error) throw new Error("Erro ao criar conta: " + error.message);
+      if (error) throw new Error("Erro ao salvar perfil: " + error.message);
       
-      // Salva a sessão automaticamente após registo
-      localStorage.setItem('user_session', JSON.stringify(data));
       return data;
     },
 
-    logout: async () => { localStorage.clear(); window.location.href = "/"; }
+    logout: async () => { 
+        await supabase.auth.signOut(); 
+        window.location.href = "/"; 
+    }
   },
 
   entities: new Proxy({}, {
