@@ -55,7 +55,7 @@ export default function Home() {
         <motion.div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: 'url(img/fotodela.png)',
+            backgroundImage: 'url(img/fotodela.webp)',
             y: backgroundY,
             scale: 1.1
           }}
@@ -148,7 +148,7 @@ export default function Home() {
             >
               <div className="absolute inset-0 bg-[var(--primary)]/10 mix-blend-overlay z-10" />
               <img
-                src="img/ela2.png"
+                src="img/ela2.webp"
                 alt="Salão"
                 className="w-full h-full object-cover"
               />
