@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Calendar, Star, Sparkles, Heart, MapPin, Phone, Loader2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import TestimonialsSection from "@/components/TestimonialsSection";
 
 // Variantes para animação de entrada (Staggered)
@@ -26,6 +26,11 @@ const itemVariants = {
 };
 
 export default function Home() {
+  const { scrollY } = useScroll();
+  const backgroundY = useTransform(scrollY, [0, 800], ['0%', '40%']);
+  const textOpacity = useTransform(scrollY, [0, 400], [1, 0]);
+  const textY = useTransform(scrollY, [0, 400], [0, 100]);
+
   const { data: services = [], isLoading: isLoadingServices } = useQuery({
     queryKey: ['featured-services'],
     queryFn: () => base44.entities.Service.filter({ is_featured: true, is_active: true }, 'name', 3),
@@ -45,24 +50,27 @@ export default function Home() {
     // 'overflow-hidden' garante que animações laterais não criem barra de rolagem no celular
     <div className="bg-white overflow-hidden w-full max-w-[100vw]">
       
-      {/* Hero Section com Efeito Ken Burns (Zoom Lento) */}
+      {/* Hero Section com Efeito Ken Burns (Zoom Lento) e Parallax */}
       <section className="relative h-[90vh] flex items-center justify-center overflow-hidden">
         <motion.div
           className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage: 'url(img/fotodela.png)',
+            y: backgroundY,
+            scale: 1.1
           }}
-          initial={{ scale: 1.1, filter: 'brightness(0.5)' }} // Começa com zoom
-          animate={{ scale: 1, filter: 'brightness(0.7)' }}   // Diminui o zoom suavemente
-          transition={{ duration: 10, ease: "easeOut" }}      // Demora 10 segundos (cinematográfico)
+          initial={{ filter: 'brightness(0.5)' }} 
+          animate={{ filter: 'brightness(0.7)' }}   
+          transition={{ duration: 10, ease: "easeOut" }}      
         />
         
         {/* Gradiente para leitura */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
 
         <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
+          style={{ opacity: textOpacity, y: textY }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ duration: 1, delay: 0.5 }}
           className="relative z-10 text-center px-4 max-w-4xl mx-auto"
         >
