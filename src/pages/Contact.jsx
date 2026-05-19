@@ -137,7 +137,7 @@ export default function Contact() {
         <motion.div 
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: 'url(img/fotodela4.png)',
+            backgroundImage: 'url(img/fotodela4.webp)',
           }}
           initial={{ scale: 1.1, filter: 'brightness(0.5)' }}
           animate={{ scale: 1, filter: 'brightness(0.6)' }}

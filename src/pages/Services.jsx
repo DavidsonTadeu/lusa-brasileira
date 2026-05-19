@@ -39,7 +39,7 @@ export default function Services() {
         <motion.div 
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: 'url(img/fotodela3.png)',
+            backgroundImage: 'url(img/fotodela3.webp)',
           }}
           initial={{ scale: 1.1, filter: 'brightness(0.5)' }}
           animate={{ scale: 1, filter: 'brightness(0.6)' }}
